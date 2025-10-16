@@ -11,7 +11,7 @@ type Storage interface {
 	Save(p *Page) error
 	PickRandom(userName string) (*Page, error)
 	Remove(p *Page)
-	isExists(p *Page) (bool, error)
+	IsExists(p *Page) (bool, error)
 }
 
 type Page struct {
