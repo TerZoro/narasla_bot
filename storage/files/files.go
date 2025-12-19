@@ -18,8 +18,6 @@ type Storage struct {
 
 const defaultPerm = 0774
 
-var ErrNoSavedPages = errors.New("Storage: no saved pages")
-
 func New(basePath string) Storage {
 	return Storage{basePath: basePath}
 }
@@ -65,7 +63,7 @@ func (s Storage) PickRandom(userName string) (page *storage.Page, err error) {
 	}
 
 	if len(files) == 0 {
-		return nil, ErrNoSavedPages
+		return nil, storage.ErrNoSavedPages
 	}
 
 	source := rand.NewSource(time.Now().Unix())
@@ -88,6 +86,7 @@ func (s Storage) Remove(p *storage.Page) error {
 
 	if err := os.Remove(path); err != nil {
 		msg := fmt.Sprintf("Storage: Remove page failed %s", path)
+
 		return e.Wrap(msg, err)
 	}
 
