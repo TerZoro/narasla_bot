@@ -1,0 +1,16 @@
+# secrets
+.env
+*.env
+.env.*
+secrets/
+*.key
+*.pem
+
+# build
+bin/
+dist/
+*.exe
+*.out
+
+# OS junk
+.DS_Store
