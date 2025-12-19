@@ -4,21 +4,36 @@ import (
 	"flag"
 	"log"
 
-	"narasla_bot/clients/telegram"
+	tgClient "narasla_bot/clients/telegram"
+	"narasla_bot/consumers/event_consumer"
+	"narasla_bot/events/telegram"
+	"narasla_bot/storage/files"
 )
 
 // temporary
 const (
-	tgBotHost = "api.telegram.org"
+	tgBotHost   = "api.telegram.org"
+	storagePath = "storage"
+	batchSize   = 100
 )
 
 func main() {
-	tgClient := telegram.New(tgBotHost, mustToken())
+	eventsProcessor := telegram.New(
+		tgClient.New(tgBotHost, mustToken()),
+		files.New(storagePath),
+	)
+
+	log.Print("Server is running")
+
+	consumer := event_consumer.New(eventsProcessor, eventsProcessor, batchSize)
+	if err := consumer.Start(); err != nil {
+		log.Fatal("servise is stopped", err)
+	}
 }
 
 func mustToken() string {
 	tok := flag.String(
-		"telegram-bot-token",
+		"tg-bot-token",
 		"",
 		"token for access to telegram bot",
 	)

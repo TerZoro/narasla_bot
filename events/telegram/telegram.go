@@ -16,8 +16,8 @@ type Processor struct {
 }
 
 var (
-	ErrorUnknownEventType = errors.New("Events: Unknown event type")
-	ErrorUnknownMetaType  = errors.New("Events: Unknown meta type")
+	ErrorUnknownEventType = errors.New("events: unknown event type")
+	ErrorUnknownMetaType  = errors.New("events: unknown meta type")
 )
 
 // now we implement Meta interface exclusively for telegram
@@ -58,6 +58,8 @@ func (p *Processor) Process(event events.Event) error {
 	switch event.Type {
 	case events.Message:
 		return p.processMessage(event)
+	case events.Unknown:
+		return nil
 	default:
 		return e.Wrap("Events: Process failed to process message", ErrorUnknownEventType)
 	}

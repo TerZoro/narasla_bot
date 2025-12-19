@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"narasla_bot/lib/e"
 	"narasla_bot/storage"
@@ -17,6 +18,8 @@ type Storage struct {
 }
 
 const defaultPerm = 0774
+
+var userDirNotFound = errors.New("user's directory not found")
 
 func New(basePath string) Storage {
 	return Storage{basePath: basePath}
@@ -55,7 +58,14 @@ func (s Storage) Save(page *storage.Page) (err error) {
 func (s Storage) PickRandom(userName string) (page *storage.Page, err error) {
 	defer func() { err = e.Wrap("Storage: PickRandom failed", err) }()
 
-	path := filepath.Join(s.basePath, userName)
+	path, err := searchUserDir(s.basePath, userName)
+	if err != nil {
+		if errors.Is(err, userDirNotFound) {
+			return nil, storage.ErrNoSavedPages
+		}
+
+		return nil, err
+	}
 
 	files, err := os.ReadDir(path)
 	if err != nil {
@@ -74,6 +84,32 @@ func (s Storage) PickRandom(userName string) (page *storage.Page, err error) {
 	file := files[n]
 
 	return s.decodePage(filepath.Join(path, file.Name()))
+}
+
+func searchUserDir(root, username string) (string, error) {
+	var foundDir string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() && d.Name() == username {
+			foundDir = path
+			return fs.SkipAll
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if foundDir == "" {
+		return "", userDirNotFound
+	}
+
+	return foundDir, nil
 }
 
 func (s Storage) Remove(p *storage.Page) error {
