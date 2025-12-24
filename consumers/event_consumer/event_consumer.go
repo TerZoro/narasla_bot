@@ -1,6 +1,7 @@
 package event_consumer
 
 import (
+	"context"
 	"errors"
 	"log"
 	"narasla_bot/events"
@@ -17,7 +18,7 @@ type Consumer struct {
 }
 
 const (
-	trials    = 10
+	trials    = 8
 	baseDelay = 100 * time.Millisecond
 )
 
@@ -29,21 +30,38 @@ func New(fetcher events.Fetcher, processor events.Processor, bathsize int) Consu
 	}
 }
 
-func (c Consumer) Start() error {
+func (c Consumer) Start(ctx context.Context) error {
 	for {
-		gotEvents, err := fetchWithRetry(c.fetcher, c.bathSize, trials)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		gotEvents, err := fetchWithRetry(ctx, c.fetcher, c.bathSize, trials)
 		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
+
 			log.Printf("consumer: fetch failed after retries: %v", err)
-			time.Sleep(1 * time.Second)
+			if sleepCtx(ctx, 1*time.Second) != nil {
+				return ctx.Err()
+			}
 			continue
 		}
 
 		if len(gotEvents) == 0 {
-			time.Sleep(1 * time.Second)
+			if sleepCtx(ctx, 1*time.Second) != nil {
+				return ctx.Err()
+			}
 			continue
 		}
 
-		if err := c.handleEvents(gotEvents); err != nil {
+		if err := c.handleEvents(ctx, gotEvents); err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
+
 			log.Printf("consumer: handleEvents: %v", err)
 			continue
 		}
@@ -51,7 +69,7 @@ func (c Consumer) Start() error {
 	}
 }
 
-func (c *Consumer) handleEvents(batch []events.Event) error {
+func (c *Consumer) handleEvents(ctx context.Context, batch []events.Event) error {
 	var wg sync.WaitGroup
 
 	for _, ev := range batch {
@@ -59,10 +77,17 @@ func (c *Consumer) handleEvents(batch []events.Event) error {
 		go func(ev events.Event) {
 			defer wg.Done()
 
+			// if we already stopped, don't continue
+			if ctx.Err() != nil {
+				return
+			}
+
 			log.Printf("got new event: %s", ev.Text)
 
-			if err := processWithRetry(c.processor, ev, trials); err != nil {
-				log.Printf("event failed: %v", err)
+			if err := processWithRetry(ctx, c.processor, ev, trials); err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					log.Printf("event failed: %v", err)
+				}
 			}
 		}(ev)
 	}
@@ -72,12 +97,28 @@ func (c *Consumer) handleEvents(batch []events.Event) error {
 	return nil
 }
 
-func fetchWithRetry(fetcher events.Fetcher, batchSize, attempts int) ([]events.Event, error) {
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
+func fetchWithRetry(ctx context.Context, fetcher events.Fetcher, batchSize, attempts int) ([]events.Event, error) {
 	var lastErr error
 	delay := baseDelay
 
 	for i := 0; i < attempts; i++ {
-		events, err := fetcher.Fetch(batchSize)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		events, err := fetcher.Fetch(ctx, batchSize)
 		if err == nil {
 			return events, nil
 		}
@@ -85,7 +126,9 @@ func fetchWithRetry(fetcher events.Fetcher, batchSize, attempts int) ([]events.E
 		lastErr = err
 
 		if i < attempts-1 {
-			time.Sleep(delay)
+			if err := sleepCtx(ctx, delay); err != nil {
+				return nil, err
+			}
 			delay *= 2
 		}
 	}
@@ -93,12 +136,16 @@ func fetchWithRetry(fetcher events.Fetcher, batchSize, attempts int) ([]events.E
 	return nil, lastErr
 }
 
-func processWithRetry(p events.Processor, ev events.Event, attempts int) error {
+func processWithRetry(ctx context.Context, p events.Processor, ev events.Event, attempts int) error {
 	var lastErr error
 	delay := baseDelay
 
 	for i := 0; i < attempts; i++ {
-		err := p.Process(ev)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		err := p.Process(ctx, ev)
 		if err == nil {
 			return nil
 		}
@@ -112,7 +159,9 @@ func processWithRetry(p events.Processor, ev events.Event, attempts int) error {
 		log.Printf("retrying process (%d/%d): %v", i+1, attempts, err)
 
 		if i < attempts-1 {
-			time.Sleep(delay)
+			if err := sleepCtx(ctx, delay); err != nil {
+				return err
+			}
 			delay *= 2
 		}
 	}

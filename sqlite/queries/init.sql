@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS pages (url TEXT, user_name TEXT);

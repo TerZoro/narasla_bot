@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"errors"
 	"narasla_bot/clients/telegram"
 	"narasla_bot/events"
@@ -20,21 +21,29 @@ var (
 	ErrorUnknownMetaType  = errors.New("events: unknown meta type")
 )
 
+func New(tg *telegram.Client, st storage.Storage) *Processor {
+	return &Processor{
+		tg:      tg,
+		storage: st,
+	}
+}
+
 // now we implement Meta interface exclusively for telegram
 type Meta struct {
 	ChatID   int
 	Username string
 }
 
-func New(client *telegram.Client, storage storage.Storage) *Processor {
-	return &Processor{
-		tg:      client,
-		storage: storage,
+func (p *Processor) Fetch(ctx context.Context, limit int) ([]events.Event, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
-}
 
-func (p *Processor) Fetch(limit int) ([]events.Event, error) {
-	updates, err := p.tg.Updates(p.offset, limit)
+	updates, err := p.tg.Updates(ctx, p.offset, limit)
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return nil, e.Wrap("Events: telegram Fetch failed to get context", err)
+	}
+
 	if err != nil {
 		return nil, e.Wrap("Events: telegram Fetch failed to get events", err)
 	}
@@ -54,10 +63,14 @@ func (p *Processor) Fetch(limit int) ([]events.Event, error) {
 	return res, nil
 }
 
-func (p *Processor) Process(event events.Event) error {
+func (p *Processor) Process(ctx context.Context, event events.Event) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	switch event.Type {
 	case events.Message:
-		return p.processMessage(event)
+		return p.processMessage(ctx, event)
 	case events.Unknown:
 		return nil
 	default:
@@ -65,13 +78,13 @@ func (p *Processor) Process(event events.Event) error {
 	}
 }
 
-func (p *Processor) processMessage(event events.Event) error {
+func (p *Processor) processMessage(ctx context.Context, event events.Event) error {
 	meta, err := meta(event)
 	if err != nil {
 		return e.Wrap("Events: processMessage failed to process message", err)
 	}
 
-	if err := p.doCmd(event.Text, meta.ChatID, meta.Username); err != nil {
+	if err := p.doCmd(ctx, event.Text, meta.ChatID, meta.Username); err != nil {
 		return e.Wrap("Events: processMessage failed to process message", err)
 	}
 

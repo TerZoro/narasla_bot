@@ -1,0 +1,1 @@
+INSERT INTO pages (url, user_name) VALUES (?, ?);
