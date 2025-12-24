@@ -12,5 +12,9 @@ dist/
 *.exe
 *.out
 
+# db
+data/
+*.db
+
 # OS junk
 .DS_Store
