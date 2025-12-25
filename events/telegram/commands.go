@@ -3,19 +3,25 @@ package telegram
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"narasla_bot/clients/telegram"
 	"narasla_bot/lib/e"
 	"narasla_bot/storage"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
+const limit = 20
+
 const (
-	RndCmd   = "/rnd"
-	HelpCmd  = "/help"
-	StartCmd = "/start"
+	RndCmd    = "/rnd"
+	HelpCmd   = "/help"
+	StartCmd  = "/start"
+	DeleteCmd = "/del"
+	ListCmd   = "/list"
 )
 
 func (p *Processor) doCmd(ctx context.Context, text string, chatID int, username string) error {
@@ -30,13 +36,27 @@ func (p *Processor) doCmd(ctx context.Context, text string, chatID int, username
 		return p.savePage(ctx, chatID, text, username)
 	}
 
-	switch text {
+	parts := strings.Fields(text)
+	if len(parts) == 0 {
+		return nil
+	}
+	cmd := parts[0]
+	arg := ""
+	if len(parts) > 1 {
+		arg = strings.Join(parts[1:], " ")
+	}
+
+	switch cmd {
 	case RndCmd:
 		return p.sendRandom(ctx, chatID, username)
 	case HelpCmd:
 		return p.sendHelp(ctx, chatID)
 	case StartCmd:
 		return p.sendHello(ctx, chatID)
+	case DeleteCmd:
+		return p.removePage(ctx, chatID, username, arg)
+	case ListCmd:
+		return p.sendList(ctx, chatID, username)
 	default:
 		return p.tg.SendMessage(ctx, chatID, msgUnknownCommand)
 	}
@@ -103,6 +123,79 @@ func (p *Processor) sendHello(ctx context.Context, chatID int) error {
 
 func (p *Processor) sendHelp(ctx context.Context, chatID int) error {
 	return p.tg.SendMessage(ctx, chatID, msgHelp)
+}
+
+func (p *Processor) removePage(ctx context.Context, chatID int, username, arg string) (err error) {
+	defer func() { err = e.Wrap("Commands: can't delete page", err) }()
+
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
+	arg = strings.TrimSpace(arg)
+
+	if arg == "" {
+		return p.sendList(ctx, chatID, username)
+	}
+
+	if isURL(arg) {
+		if err := p.storage.RemoveByURL(ctx, username, arg); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return sendMsg(msgNoSavedPages)
+			}
+
+			return err
+		}
+		return sendMsg(msgDeleted)
+	}
+
+	num, err := strconv.Atoi(arg)
+	if err != nil || num <= 0 {
+		return sendMsg(msgIncorrectDeleteArg)
+	}
+
+	list, err := p.storage.List(ctx, username, limit, 0)
+	if err != nil {
+		return err
+	}
+
+	if len(list) == 0 {
+		return sendMsg(msgNoSavedPages)
+	}
+
+	if num > len(list) {
+		return sendMsg(
+			fmt.Sprintf("You have only %d items in the list. Send /del to see them.", len(list)))
+	}
+
+	page := list[num-1]
+	if err := p.storage.Remove(ctx, &page); err != nil {
+		return err
+	}
+
+	return sendMsg(msgDeleted)
+}
+
+func (p *Processor) sendList(ctx context.Context, chatID int, username string) (err error) {
+	defer func() { err = e.Wrap("Command: can't send list", err) }()
+
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
+
+	list, err := p.storage.List(ctx, username, limit, 0)
+	if err != nil {
+		return err
+	}
+	if len(list) == 0 {
+		return sendMsg(msgNoSavedPages)
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Your saved pages: \n\n")
+
+	for i, p := range list {
+		sb.WriteString(fmt.Sprintf("%d. — %s\n", i+1, p.URL))
+	}
+
+	sb.WriteString("\nDelete: /del <number> or /del <url>")
+
+	return sendMsg(sb.String())
 }
 
 // using wrapper reduces redundant usage of chatID in savePage func, and makes code more readable.

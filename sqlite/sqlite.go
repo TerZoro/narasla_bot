@@ -26,6 +26,15 @@ var qIsExists string
 //go:embed queries/init.sql
 var qInit string
 
+//go:embed queries/remove_by_url.sql
+var qRemoveByUrl string
+
+//go:embed queries/list.sql
+var qList string
+
+//go:embed queries/count.sql
+var qCount string
+
 type Storage struct {
 	db *sql.DB
 }
@@ -52,9 +61,10 @@ func (s *Storage) Save(ctx context.Context, page *storage.Page) error {
 }
 
 func (s *Storage) PickRandom(ctx context.Context, userName string) (*storage.Page, error) {
+	var id int
 	var url string
 
-	err := s.db.QueryRowContext(ctx, qPickRandom, userName).Scan(&url)
+	err := s.db.QueryRowContext(ctx, qPickRandom, userName).Scan(&id, &url)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storage.ErrNoSavedPages
 	}
@@ -63,17 +73,80 @@ func (s *Storage) PickRandom(ctx context.Context, userName string) (*storage.Pag
 	}
 
 	return &storage.Page{
+		ID:       id,
 		URL:      url,
 		UserName: userName,
 	}, nil
 }
 
 func (s *Storage) Remove(ctx context.Context, page *storage.Page) error {
-	if _, err := s.db.ExecContext(ctx, qRemove, page.URL, page.UserName); err != nil {
+	res, err := s.db.ExecContext(ctx, qRemove, page.UserName, page.ID)
+	if err != nil {
 		return fmt.Errorf("can't remove page: %w", err)
 	}
 
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return storage.ErrNotFound
+	}
+
 	return nil
+}
+
+func (s *Storage) RemoveByURL(ctx context.Context, username, url string) error {
+	res, err := s.db.ExecContext(ctx, qRemoveByUrl, url, username)
+	if err != nil {
+		return fmt.Errorf("can't remove page: %w", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return storage.ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *Storage) List(ctx context.Context, username string, limit, offset int) ([]storage.Page, error) {
+	rows, err := s.db.QueryContext(ctx, qList, username, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("can't get list: %w", err)
+	}
+	defer rows.Close()
+
+	list := make([]storage.Page, 0, limit)
+
+	for rows.Next() {
+		var page storage.Page
+		page.UserName = username
+		if err := rows.Scan(&page.ID, &page.URL, &page.CreatedAt); err != nil {
+			return list, fmt.Errorf("can't scan page: %w", err)
+		}
+		list = append(list, page)
+	}
+
+	if err = rows.Err(); err != nil {
+		return list, fmt.Errorf("can't get rows: %w", err)
+	}
+
+	return list, nil
+}
+
+func (s *Storage) Count(ctx context.Context, username string) (int, error) {
+	var count int
+
+	err := s.db.QueryRowContext(ctx, qCount, username).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("can't count pages: %w", err)
+	}
+
+	return count, nil
 }
 
 // IsExists checks if page exists in storage.

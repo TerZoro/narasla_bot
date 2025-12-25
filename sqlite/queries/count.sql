@@ -1,0 +1,1 @@
+SELECT Count(*) FROM pages WHERE user_name = ?;

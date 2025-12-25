@@ -1,1 +1,7 @@
-CREATE TABLE IF NOT EXISTS pages (url TEXT, user_name TEXT);
+CREATE TABLE IF NOT EXISTS pages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_name, url)
+);

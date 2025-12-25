@@ -1,1 +1,1 @@
-SELECT url FROM pages WHERE user_name = ? ORDER BY RANDOM() Limit 1;
+SELECT id, url FROM pages WHERE user_name = ? ORDER BY RANDOM() Limit 1;

@@ -7,21 +7,30 @@ import (
 	"fmt"
 	"io"
 	"narasla_bot/lib/e"
+	"time"
 )
 
+// TODO: implement new fields
 type Storage interface {
 	Save(ctx context.Context, p *Page) error
 	PickRandom(ctx context.Context, userName string) (*Page, error)
 	Remove(ctx context.Context, p *Page) error
+	RemoveByURL(ctx context.Context, username, url string) error
+	List(ctx context.Context, username string, limit, offset int) ([]Page, error)
+	Count(ctx context.Context, username string) (int, error)
 	IsExists(ctx context.Context, p *Page) (bool, error)
 }
 
-var ErrNoSavedPages = errors.New("Storage: no saved pages")
+var (
+	ErrNoSavedPages = errors.New("Storage: no saved pages")
+	ErrNotFound     = errors.New("Storage: page not found")
+)
 
 type Page struct {
-	URL      string
-	UserName string
-	// Created time.Time
+	ID        int
+	URL       string
+	UserName  string
+	CreatedAt time.Time
 }
 
 func (p *Page) Hash() (string, error) {
