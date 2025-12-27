@@ -30,7 +30,7 @@ func (p *Processor) doCmd(ctx context.Context, text string, chatID, userID int64
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	log.Printf("Commands: got new message '%s' from '%s'", text, username)
+	log.Printf("Commands: got new message '{\n%s\n}' from '%s'", text, username)
 
 	if isAddCmd(text) {
 		return p.savePage(ctx, chatID, userID, text, username)

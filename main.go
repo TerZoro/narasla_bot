@@ -19,9 +19,8 @@ import (
 
 // temporary
 const (
-	tgBotHost         = "api.telegram.org"
-	sqliteStoragePath = "data/sqlite/storage.db"
-	batchSize         = 100
+	tgBotHost = "api.telegram.org"
+	batchSize = 100
 )
 
 func main() {
@@ -33,7 +32,8 @@ func main() {
 		log.Fatal("Error loading .env file: %w", err)
 	}
 
-	s, err := sqlite.New(sqliteStoragePath)
+	storagePath := getStoragePath()
+	s, err := sqlite.New(storagePath)
 	if err != nil {
 		log.Fatalf("can't connect to the storage: %v", err)
 	}
@@ -58,6 +58,10 @@ func main() {
 
 func getTgToken() string {
 	return os.Getenv("TG_BOT_TOKEN")
+}
+
+func getStoragePath() string {
+	return os.Getenv("STORAGE_PATH")
 }
 
 func mustToken() string {

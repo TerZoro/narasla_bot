@@ -13,8 +13,8 @@ dist/
 *.out
 
 # db
-data/
-*.db
+data/sqlite/storage.db
+data/**/*.db
 
 # OS junk
 .DS_Store
