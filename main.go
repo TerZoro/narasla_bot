@@ -42,9 +42,12 @@ func main() {
 		log.Fatalf("can't init sql storage: %v", err)
 	}
 
+	botUsername := getBotUsername()
+
 	eventsProcessor := telegram.New(
 		tgClient.New(tgBotHost, getTgToken()),
 		s,
+		botUsername,
 	)
 
 	log.Print("Server is running")
@@ -62,6 +65,10 @@ func getTgToken() string {
 
 func getStoragePath() string {
 	return os.Getenv("STORAGE_PATH")
+}
+
+func getBotUsername() string {
+	return os.Getenv("BOT_USERNAME")
 }
 
 func mustToken() string {

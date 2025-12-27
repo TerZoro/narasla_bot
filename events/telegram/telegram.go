@@ -10,29 +10,41 @@ import (
 	"narasla_bot/storage"
 )
 
-type Processor struct {
-	tg      *telegram.Client
-	offset  int
-	storage storage.Storage // interface
-}
-
 var (
 	ErrorUnknownEventType = errors.New("events: unknown event type")
 	ErrorUnknownMetaType  = errors.New("events: unknown meta type")
 )
 
-func New(tg *telegram.Client, st storage.Storage) *Processor {
-	return &Processor{
-		tg:      tg,
-		storage: st,
-	}
+type Processor struct {
+	tg          *telegram.Client
+	offset      int
+	storage     storage.Storage // interface
+	botUsername string
+	handlers    map[string]handler
 }
 
 // now we implement Meta interface exclusively for telegram
 type Meta struct {
-	ChatID   int64
+	Chat     Chat
 	UserID   int64
 	Username string
+}
+
+type Chat struct {
+	ID   int64
+	Type string // "private", "group", "supergroup", or "channel"
+}
+
+type handler func(ctx context.Context, arg string, m Meta) error
+
+func New(tg *telegram.Client, st storage.Storage, botUsername string) *Processor {
+	p := &Processor{
+		tg:          tg,
+		storage:     st,
+		botUsername: botUsername,
+	}
+	p.initHandlers()
+	return p
 }
 
 func (p *Processor) Fetch(ctx context.Context, limit int) ([]events.Event, error) {
@@ -85,7 +97,7 @@ func (p *Processor) processMessage(ctx context.Context, event events.Event) erro
 		return e.Wrap("Events: processMessage failed to process message", err)
 	}
 
-	if err := p.doCmd(ctx, event.Text, meta.ChatID, meta.UserID, meta.Username); err != nil {
+	if err := p.doCmd(ctx, event.Text, meta); err != nil {
 		return e.Wrap("Events: processMessage failed to process message", err)
 	}
 
@@ -111,13 +123,20 @@ func event(upd telegram.Update) events.Event {
 
 	if updType == events.Message {
 		res.Meta = Meta{
-			ChatID:   upd.Message.Chat.ID,
+			Chat:     getChatData(upd),
 			UserID:   upd.Message.From.ID,
 			Username: upd.Message.From.Username,
 		}
 	}
 
 	return res
+}
+
+func getChatData(upd telegram.Update) Chat {
+	return Chat{
+		ID:   upd.Message.Chat.ID,
+		Type: upd.Message.Chat.Type,
+	}
 }
 
 func fetchType(upd telegram.Update) events.Type {

@@ -17,6 +17,7 @@ import (
 const limit = 20
 
 const (
+	SaveCmd   = "/save"
 	RndCmd    = "/rnd"
 	HelpCmd   = "/help"
 	StartCmd  = "/start"
@@ -24,42 +25,74 @@ const (
 	ListCmd   = "/list"
 )
 
-func (p *Processor) doCmd(ctx context.Context, text string, chatID, userID int64, username string) error {
-	text = strings.TrimSpace(text)
-
+func (p *Processor) doCmd(ctx context.Context, text string, m Meta) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	log.Printf("Commands: got new message '{\n%s\n}' from '%s'", text, username)
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
 
-	if isAddCmd(text) {
-		return p.savePage(ctx, chatID, userID, text, username)
+	log.Printf("Chat Type: %s", m.Chat.Type)
+
+	if m.Chat.Type == "private" && isAddCmd(text) {
+		return p.savePage(ctx, m.Chat.ID, m.UserID, text, m.Username)
 	}
 
 	parts := strings.Fields(text)
 	if len(parts) == 0 {
 		return nil
 	}
-	cmd := parts[0]
+	cmdRaw := parts[0]
+
+	if !strings.HasPrefix(cmdRaw, "/") {
+		return nil
+	}
+
 	arg := ""
 	if len(parts) > 1 {
 		arg = strings.Join(parts[1:], " ")
 	}
 
-	switch cmd {
-	case RndCmd:
-		return p.sendRandom(ctx, chatID, userID)
-	case HelpCmd:
-		return p.sendHelp(ctx, chatID, userID)
-	case StartCmd:
-		return p.sendHello(ctx, chatID, userID)
-	case DeleteCmd:
-		return p.removePage(ctx, chatID, userID, username, arg)
-	case ListCmd:
-		return p.sendList(ctx, chatID, userID, username)
-	default:
-		return p.tg.SendMessage(ctx, chatID, userID, msgUnknownCommand)
+	cmd, ok := p.resolveCmd(cmdRaw, m.Chat.Type)
+	if !ok {
+		return nil
 	}
+
+	log.Printf("Commands: got new message '{\n%s\n}' from '%s'", text, m.Username)
+
+	return p.middleHandler(ctx, cmd, arg, m)
+}
+
+func (p *Processor) resolveCmd(cmdRaw, chatType string) (string, bool) {
+	isPrivate := chatType == "private"
+	mentionBot := strings.Contains(cmdRaw, "@")
+
+	if !isPrivate && !mentionBot {
+		return "", false
+	}
+
+	if !mentionBot {
+		return cmdRaw, true
+	}
+
+	return p.normalizeCmd(cmdRaw)
+}
+
+func (p *Processor) normalizeCmd(cmdRaw string) (string, bool) {
+	cmd := cmdRaw
+	if i := strings.IndexByte(cmdRaw, '@'); i != -1 {
+		base := cmdRaw[:i]
+		bot := cmdRaw[i+1:]
+
+		if p.botUsername != "" && !strings.EqualFold(bot, p.botUsername) {
+			return "", false
+		}
+		cmd = base
+	}
+
+	return cmd, true
 }
 
 func (p *Processor) savePage(ctx context.Context, chatID, userID int64, pageURL, username string) (err error) {
