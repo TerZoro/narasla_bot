@@ -1,1 +1,1 @@
-SELECT id, url, created_at FROM pages WHERE user_name = ? ORDER BY id DESC LIMIT ? OFFSET ?;
+SELECT id, url, created_at FROM pages WHERE owner_id = ? ORDER BY id ASC LIMIT ? OFFSET ?;

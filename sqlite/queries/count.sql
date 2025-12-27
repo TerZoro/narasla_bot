@@ -1,1 +1,1 @@
-SELECT Count(*) FROM pages WHERE user_name = ?;
+SELECT Count(*) FROM pages WHERE owner_id = ?;

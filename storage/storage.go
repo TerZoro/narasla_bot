@@ -13,12 +13,12 @@ import (
 // TODO: implement new fields
 type Storage interface {
 	Save(ctx context.Context, p *Page) error
-	PickRandom(ctx context.Context, userName string) (*Page, error)
+	PickRandom(ctx context.Context, ownerID int64) (*Page, error)
 	Remove(ctx context.Context, p *Page) error
-	RemoveByURL(ctx context.Context, username, url string) error
-	List(ctx context.Context, username string, limit, offset int) ([]Page, error)
-	Count(ctx context.Context, username string) (int, error)
-	IsExists(ctx context.Context, p *Page) (bool, error)
+	RemoveByURL(ctx context.Context, ownerID int64, url string) error
+	List(ctx context.Context, ownerID int64, username string, limit, offset int) ([]Page, error)
+	Count(ctx context.Context, ownerID int64) (int, error)
+	IsExists(ctx context.Context, ownerID int64, url string) (bool, error)
 }
 
 var (
@@ -27,8 +27,10 @@ var (
 )
 
 type Page struct {
-	ID        int
+	ID        int64
 	URL       string
+	OwnerID   int64 // User.ID
+	ChatID    int64
 	UserName  string
 	CreatedAt time.Time
 }

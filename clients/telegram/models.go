@@ -17,9 +17,10 @@ type IncomingMessage struct {
 }
 
 type From struct {
+	ID       int64  `json:"id"`
 	Username string `json:"username"`
 }
 
 type Chat struct {
-	ID int `json:"id"`
+	ID int64 `json:"id"`
 }

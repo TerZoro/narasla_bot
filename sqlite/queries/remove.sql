@@ -1,1 +1,1 @@
-DELETE FROM pages WHERE user_name = ? AND id = ?;
+DELETE FROM pages WHERE owner_id = ? AND id = ?;

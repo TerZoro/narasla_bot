@@ -1,1 +1,1 @@
-INSERT INTO pages (url, user_name) VALUES (?, ?);
+INSERT INTO pages (owner_id, chat_id, url, user_name) VALUES (?, ?, ?, ?);

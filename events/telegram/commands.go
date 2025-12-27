@@ -24,7 +24,7 @@ const (
 	ListCmd   = "/list"
 )
 
-func (p *Processor) doCmd(ctx context.Context, text string, chatID int, username string) error {
+func (p *Processor) doCmd(ctx context.Context, text string, chatID, userID int64, username string) error {
 	text = strings.TrimSpace(text)
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -33,7 +33,7 @@ func (p *Processor) doCmd(ctx context.Context, text string, chatID int, username
 	log.Printf("Commands: got new message '%s' from '%s'", text, username)
 
 	if isAddCmd(text) {
-		return p.savePage(ctx, chatID, text, username)
+		return p.savePage(ctx, chatID, userID, text, username)
 	}
 
 	parts := strings.Fields(text)
@@ -48,31 +48,33 @@ func (p *Processor) doCmd(ctx context.Context, text string, chatID int, username
 
 	switch cmd {
 	case RndCmd:
-		return p.sendRandom(ctx, chatID, username)
+		return p.sendRandom(ctx, chatID, userID)
 	case HelpCmd:
-		return p.sendHelp(ctx, chatID)
+		return p.sendHelp(ctx, chatID, userID)
 	case StartCmd:
-		return p.sendHello(ctx, chatID)
+		return p.sendHello(ctx, chatID, userID)
 	case DeleteCmd:
-		return p.removePage(ctx, chatID, username, arg)
+		return p.removePage(ctx, chatID, userID, username, arg)
 	case ListCmd:
-		return p.sendList(ctx, chatID, username)
+		return p.sendList(ctx, chatID, userID, username)
 	default:
-		return p.tg.SendMessage(ctx, chatID, msgUnknownCommand)
+		return p.tg.SendMessage(ctx, chatID, userID, msgUnknownCommand)
 	}
 }
 
-func (p *Processor) savePage(ctx context.Context, chatID int, pageURL string, username string) (err error) {
+func (p *Processor) savePage(ctx context.Context, chatID, userID int64, pageURL, username string) (err error) {
 	defer func() { err = e.Wrap("Commands: can't do savePage", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
 
 	page := &storage.Page{
 		URL:      pageURL,
+		OwnerID:  userID,
+		ChatID:   chatID,
 		UserName: username,
 	}
 
-	isExists, err := p.storage.IsExists(ctx, page)
+	isExists, err := p.storage.IsExists(ctx, userID, pageURL)
 	if err != nil {
 		return err
 	}
@@ -92,12 +94,12 @@ func (p *Processor) savePage(ctx context.Context, chatID int, pageURL string, us
 	return nil
 }
 
-func (p *Processor) sendRandom(ctx context.Context, chatID int, username string) (err error) {
+func (p *Processor) sendRandom(ctx context.Context, chatID, userID int64) (err error) {
 	defer func() { err = e.Wrap("Commands: can't do sendRandom", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
 
-	randPage, err := p.storage.PickRandom(ctx, username)
+	randPage, err := p.storage.PickRandom(ctx, userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNoSavedPages) {
 			return sendMsg(msgNoSavedPages)
@@ -110,33 +112,33 @@ func (p *Processor) sendRandom(ctx context.Context, chatID int, username string)
 		return sendMsg(msgNoSavedPages)
 	}
 
-	if err := p.tg.SendMessage(ctx, chatID, randPage.URL); err != nil {
+	if err := p.tg.SendMessage(ctx, chatID, userID, randPage.URL); err != nil {
 		return err
 	}
 
 	return p.storage.Remove(ctx, randPage)
 }
 
-func (p *Processor) sendHello(ctx context.Context, chatID int) error {
-	return p.tg.SendMessage(ctx, chatID, msgHello)
+func (p *Processor) sendHello(ctx context.Context, chatID, userID int64) error {
+	return p.tg.SendMessage(ctx, chatID, userID, msgHello)
 }
 
-func (p *Processor) sendHelp(ctx context.Context, chatID int) error {
-	return p.tg.SendMessage(ctx, chatID, msgHelp)
+func (p *Processor) sendHelp(ctx context.Context, chatID, userID int64) error {
+	return p.tg.SendMessage(ctx, chatID, userID, msgHelp)
 }
 
-func (p *Processor) removePage(ctx context.Context, chatID int, username, arg string) (err error) {
+func (p *Processor) removePage(ctx context.Context, chatID, userID int64, username, arg string) (err error) {
 	defer func() { err = e.Wrap("Commands: can't delete page", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
 	arg = strings.TrimSpace(arg)
 
 	if arg == "" {
-		return p.sendList(ctx, chatID, username)
+		return p.sendList(ctx, chatID, userID, username)
 	}
 
 	if isURL(arg) {
-		if err := p.storage.RemoveByURL(ctx, username, arg); err != nil {
+		if err := p.storage.RemoveByURL(ctx, userID, arg); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				return sendMsg(msgNoSavedPages)
 			}
@@ -151,7 +153,7 @@ func (p *Processor) removePage(ctx context.Context, chatID int, username, arg st
 		return sendMsg(msgIncorrectDeleteArg)
 	}
 
-	list, err := p.storage.List(ctx, username, limit, 0)
+	list, err := p.storage.List(ctx, userID, username, limit, 0)
 	if err != nil {
 		return err
 	}
@@ -173,12 +175,12 @@ func (p *Processor) removePage(ctx context.Context, chatID int, username, arg st
 	return sendMsg(msgDeleted)
 }
 
-func (p *Processor) sendList(ctx context.Context, chatID int, username string) (err error) {
+func (p *Processor) sendList(ctx context.Context, chatID, userID int64, username string) (err error) {
 	defer func() { err = e.Wrap("Command: can't send list", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
 
-	list, err := p.storage.List(ctx, username, limit, 0)
+	list, err := p.storage.List(ctx, userID, username, limit, 0)
 	if err != nil {
 		return err
 	}
@@ -187,7 +189,7 @@ func (p *Processor) sendList(ctx context.Context, chatID int, username string) (
 	}
 
 	var sb strings.Builder
-	sb.WriteString("Your saved pages: \n\n")
+	sb.WriteString(fmt.Sprintf("@%s 's saved pages:\n\n", username))
 
 	for i, p := range list {
 		sb.WriteString(fmt.Sprintf("%d. — %s\n", i+1, p.URL))
@@ -199,9 +201,9 @@ func (p *Processor) sendList(ctx context.Context, chatID int, username string) (
 }
 
 // using wrapper reduces redundant usage of chatID in savePage func, and makes code more readable.
-func newMessageSender(ctx context.Context, chatID int, tgClient *telegram.Client) func(string) error {
+func newMessageSender(ctx context.Context, chatID, userID int64, tgClient *telegram.Client) func(string) error {
 	return func(msg string) error {
-		return tgClient.SendMessage(ctx, chatID, msg)
+		return tgClient.SendMessage(ctx, chatID, userID, msg)
 	}
 }
 

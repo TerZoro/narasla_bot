@@ -30,7 +30,8 @@ func New(tg *telegram.Client, st storage.Storage) *Processor {
 
 // now we implement Meta interface exclusively for telegram
 type Meta struct {
-	ChatID   int
+	ChatID   int64
+	UserID   int64
 	Username string
 }
 
@@ -84,7 +85,7 @@ func (p *Processor) processMessage(ctx context.Context, event events.Event) erro
 		return e.Wrap("Events: processMessage failed to process message", err)
 	}
 
-	if err := p.doCmd(ctx, event.Text, meta.ChatID, meta.Username); err != nil {
+	if err := p.doCmd(ctx, event.Text, meta.ChatID, meta.UserID, meta.Username); err != nil {
 		return e.Wrap("Events: processMessage failed to process message", err)
 	}
 
@@ -111,6 +112,7 @@ func event(upd telegram.Update) events.Event {
 	if updType == events.Message {
 		res.Meta = Meta{
 			ChatID:   upd.Message.Chat.ID,
+			UserID:   upd.Message.From.ID,
 			Username: upd.Message.From.Username,
 		}
 	}
