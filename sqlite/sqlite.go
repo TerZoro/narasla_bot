@@ -35,6 +35,9 @@ var qList string
 //go:embed queries/count.sql
 var qCount string
 
+//go:embed queries/list_enabled_users.sql
+var qListEnabledUsers string
+
 type Storage struct {
 	db *sql.DB
 }
@@ -177,3 +180,38 @@ func (s *Storage) Init(ctx context.Context) error {
 
 	return nil
 }
+
+func (s *Storage) ListEnabledUsers(ctx context.Context) ([]storage.User, error) {
+	rows, err := s.db.QueryContext(ctx, qListEnabledUsers)
+	if err != nil {
+		return nil, fmt.Errorf("can't find enabled users: %w", err)
+	}
+	defer rows.Close()
+
+	enabledUsers := make([]storage.User, 0, 256)
+	for rows.Next() {
+		var user storage.User
+
+		err := rows.Scan(
+			&user.OwnerID,
+			&user.ChatID,
+			&user.Username,
+			&user.Timezone,
+			&user.SendHour,
+			&user.SendMinute,
+			&user.LastSendAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("can't scan enabled users: %w", err)
+		}
+		enabledUsers = append(enabledUsers, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		return enabledUsers, fmt.Errorf("can't get rows: %w", err)
+	}
+
+	return enabledUsers, nil
+}
+
+//func (s *Storage) UpdateLastSendAt(ctx context.Context, newTime int64) (storage.User, error) {}

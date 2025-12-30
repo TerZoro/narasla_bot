@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,18 @@ type Storage interface {
 	List(ctx context.Context, ownerID int64, username string, limit, offset int) ([]Page, error)
 	Count(ctx context.Context, ownerID int64) (int, error)
 	IsExists(ctx context.Context, ownerID int64, url string) (bool, error)
+	ListEnabledUsers(ctx context.Context) ([]User, error)
+}
+
+type User struct {
+	OwnerID    int64
+	ChatID     int64
+	Username   string
+	Timezone   string
+	Enabled    bool
+	SendHour   int
+	SendMinute int
+	LastSendAt sql.NullInt64 //can be nullable
 }
 
 var (
