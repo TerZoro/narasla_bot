@@ -1,0 +1,1 @@
+UPDATE users SET enabled = ? WHERE owner_id = ?;

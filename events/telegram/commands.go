@@ -17,17 +17,22 @@ import (
 const limit = 20
 
 const (
-	SaveCmd   = "/save"
-	RndCmd    = "/rnd"
-	HelpCmd   = "/help"
-	StartCmd  = "/start"
-	DeleteCmd = "/del"
-	ListCmd   = "/list"
+	SaveCmd     = "/save"
+	RndCmd      = "/rnd"
+	HelpCmd     = "/help"
+	StartCmd    = "/start"
+	DeleteCmd   = "/del"
+	ListCmd     = "/list"
+	AutopushCmd = "/autopush"
 )
 
 func (p *Processor) doCmd(ctx context.Context, text string, m Meta) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+
+	if err := p.updateUserInfo(ctx, m); err != nil {
+		return err
+	}
 
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -65,6 +70,16 @@ func (p *Processor) doCmd(ctx context.Context, text string, m Meta) error {
 	return p.middleHandler(ctx, cmd, arg, m)
 }
 
+func (p *Processor) updateUserInfo(ctx context.Context, m Meta) error {
+	if m.Chat.Type == "private" {
+		if err := p.storage.UpdateUserInfo(ctx, m.UserID, m.Chat.ID, m.Username); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (p *Processor) resolveCmd(cmdRaw, chatType string) (string, bool) {
 	isPrivate := chatType == "private"
 	mentionBot := strings.Contains(cmdRaw, "@")
@@ -98,7 +113,7 @@ func (p *Processor) normalizeCmd(cmdRaw string) (string, bool) {
 func (p *Processor) savePage(ctx context.Context, chatID, userID int64, pageURL, username string) (err error) {
 	defer func() { err = e.Wrap("Commands: can't do savePage", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
 
 	page := &storage.Page{
 		URL:      pageURL,
@@ -130,7 +145,7 @@ func (p *Processor) savePage(ctx context.Context, chatID, userID int64, pageURL,
 func (p *Processor) sendRandom(ctx context.Context, chatID, userID int64) (err error) {
 	defer func() { err = e.Wrap("Commands: can't do sendRandom", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
 
 	randPage, err := p.storage.PickRandom(ctx, userID)
 	if err != nil {
@@ -145,7 +160,7 @@ func (p *Processor) sendRandom(ctx context.Context, chatID, userID int64) (err e
 		return sendMsg(msgNoSavedPages)
 	}
 
-	if err := p.tg.SendMessage(ctx, chatID, userID, randPage.URL); err != nil {
+	if err := p.tg.SendMessage(ctx, chatID, randPage.URL); err != nil {
 		return err
 	}
 
@@ -153,17 +168,17 @@ func (p *Processor) sendRandom(ctx context.Context, chatID, userID int64) (err e
 }
 
 func (p *Processor) sendHello(ctx context.Context, chatID, userID int64) error {
-	return p.tg.SendMessage(ctx, chatID, userID, msgHello)
+	return p.tg.SendMessage(ctx, chatID, msgHello)
 }
 
 func (p *Processor) sendHelp(ctx context.Context, chatID, userID int64) error {
-	return p.tg.SendMessage(ctx, chatID, userID, msgHelp)
+	return p.tg.SendMessage(ctx, chatID, msgHelp)
 }
 
 func (p *Processor) removePage(ctx context.Context, chatID, userID int64, username, arg string) (err error) {
 	defer func() { err = e.Wrap("Commands: can't delete page", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
 	arg = strings.TrimSpace(arg)
 
 	if arg == "" {
@@ -211,7 +226,7 @@ func (p *Processor) removePage(ctx context.Context, chatID, userID int64, userna
 func (p *Processor) sendList(ctx context.Context, chatID, userID int64, username string) (err error) {
 	defer func() { err = e.Wrap("Command: can't send list", err) }()
 
-	sendMsg := newMessageSender(ctx, chatID, userID, p.tg)
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
 
 	list, err := p.storage.List(ctx, userID, username, limit, 0)
 	if err != nil {
@@ -233,10 +248,54 @@ func (p *Processor) sendList(ctx context.Context, chatID, userID int64, username
 	return sendMsg(sb.String())
 }
 
+func (p *Processor) autopush(ctx context.Context, chatID, userID int64, arg string) (err error) {
+	defer func() { err = e.Wrap("Command: can't change autopush status", err) }()
+
+	sendMsg := newMessageSender(ctx, chatID, p.tg)
+	var desired bool
+
+	arg = strings.ToLower(strings.TrimSpace(arg))
+
+	user, err := p.storage.GetUserInfo(ctx, userID)
+	if errors.Is(err, storage.ErrUserNotFound) {
+		return sendMsg(msgUnknownUser)
+	}
+	if err != nil {
+		return err
+	}
+	desired = user.Enabled
+
+	switch arg {
+	case "status":
+		if desired {
+			return sendMsg(msgAutopushTurnedOn)
+		}
+		return sendMsg(msgAutopushTurnedOff)
+	case "on":
+		desired = true
+	case "off":
+		desired = false
+
+	case "":
+		desired = !user.Enabled
+	default:
+		return sendMsg(msgIncorrectAutopush)
+	}
+
+	if err := p.storage.SwitchEnable(ctx, userID, desired); err != nil {
+		return err
+	}
+
+	if desired {
+		return sendMsg(msgAutopushTurnedOn)
+	}
+	return sendMsg(msgAutopushTurnedOff)
+}
+
 // using wrapper reduces redundant usage of chatID in savePage func, and makes code more readable.
-func newMessageSender(ctx context.Context, chatID, userID int64, tgClient *telegram.Client) func(string) error {
+func newMessageSender(ctx context.Context, chatID int64, tgClient *telegram.Client) func(string) error {
 	return func(msg string) error {
-		return tgClient.SendMessage(ctx, chatID, userID, msg)
+		return tgClient.SendMessage(ctx, chatID, msg)
 	}
 }
 

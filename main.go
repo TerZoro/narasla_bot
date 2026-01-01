@@ -3,21 +3,21 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	tgClient "narasla_bot/clients/telegram"
 	"narasla_bot/consumers/event_consumer"
 	"narasla_bot/events/telegram"
+	"narasla_bot/scheduler"
 	"narasla_bot/sqlite"
 
 	"github.com/joho/godotenv"
 )
 
-// temporary
 const (
 	tgBotHost = "api.telegram.org"
 	batchSize = 100
@@ -42,13 +42,21 @@ func main() {
 		log.Fatalf("can't init sql storage: %v", err)
 	}
 
+	tgCl := tgClient.New(tgBotHost, getTgToken())
 	botUsername := getBotUsername()
 
 	eventsProcessor := telegram.New(
-		tgClient.New(tgBotHost, getTgToken()),
+		tgCl,
 		s,
 		botUsername,
 	)
+
+	sch := scheduler.New(s, tgCl, 1*time.Minute)
+	go func() {
+		if err := sch.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("scheduler stopped: %v", err)
+		}
+	}()
 
 	log.Print("Server is running")
 
@@ -69,20 +77,4 @@ func getStoragePath() string {
 
 func getBotUsername() string {
 	return os.Getenv("BOT_USERNAME")
-}
-
-func mustToken() string {
-	tok := flag.String(
-		"tg-bot-token",
-		"",
-		"token for access to telegram bot",
-	)
-
-	flag.Parse()
-
-	if *tok == "" {
-		log.Fatal("token is not specified")
-	}
-
-	return *tok
 }

@@ -11,33 +11,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:embed queries/save.sql
-var qSave string
-
-//go:embed queries/pick_random.sql
-var qPickRandom string
-
-//go:embed queries/remove.sql
-var qRemove string
-
-//go:embed queries/is_exists.sql
-var qIsExists string
-
-//go:embed queries/init.sql
-var qInit string
-
-//go:embed queries/remove_by_url.sql
-var qRemoveByUrl string
-
-//go:embed queries/list.sql
-var qList string
-
-//go:embed queries/count.sql
-var qCount string
-
-//go:embed queries/list_enabled_users.sql
-var qListEnabledUsers string
-
 type Storage struct {
 	db *sql.DB
 }
@@ -191,7 +164,6 @@ func (s *Storage) ListEnabledUsers(ctx context.Context) ([]storage.User, error) 
 	enabledUsers := make([]storage.User, 0, 256)
 	for rows.Next() {
 		var user storage.User
-
 		err := rows.Scan(
 			&user.OwnerID,
 			&user.ChatID,
@@ -204,6 +176,9 @@ func (s *Storage) ListEnabledUsers(ctx context.Context) ([]storage.User, error) 
 		if err != nil {
 			return nil, fmt.Errorf("can't scan enabled users: %w", err)
 		}
+		if user.ChatID == 0 {
+			continue
+		}
 		enabledUsers = append(enabledUsers, user)
 	}
 
@@ -214,4 +189,65 @@ func (s *Storage) ListEnabledUsers(ctx context.Context) ([]storage.User, error) 
 	return enabledUsers, nil
 }
 
-//func (s *Storage) UpdateLastSendAt(ctx context.Context, newTime int64) (storage.User, error) {}
+func (s *Storage) UpdateLastSendAt(ctx context.Context, ownerID, newTime int64) error {
+	if _, err := s.db.ExecContext(ctx, qUpdateLastSendAt, newTime, ownerID); err != nil {
+		return fmt.Errorf("can't update last send at for user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Storage) UpdateUserInfo(ctx context.Context, ownerID, chatID int64, username string) error {
+	if _, err := s.db.ExecContext(ctx, qUpdateUserInfo, ownerID, chatID, username); err != nil {
+		return fmt.Errorf("can't update user info: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Storage) SwitchEnable(ctx context.Context, ownerID int64, enabled bool) error {
+	enabledForm := 0
+	if enabled {
+		enabledForm = 1
+	}
+	if _, err := s.db.ExecContext(ctx, qUpdateEnabled, enabledForm, ownerID); err != nil {
+		return fmt.Errorf("can't change enabled for user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Storage) GetUserInfo(ctx context.Context, ownerID int64) (*storage.User, error) {
+	var (
+		timezone    string
+		enabledForm int
+		sendHour    int
+		sendMinute  int
+		lastSendAt  sql.NullInt64
+	)
+
+	err := s.db.QueryRowContext(ctx, qGetUserInfo, ownerID).Scan(
+		&timezone,
+		&enabledForm,
+		&sendHour,
+		&sendMinute,
+		&lastSendAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, storage.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("can't get user info: %w", err)
+	}
+
+	enabled := enabledForm == 1
+
+	return &storage.User{
+		OwnerID:    ownerID,
+		Timezone:   timezone,
+		Enabled:    enabled,
+		SendHour:   sendHour,
+		SendMinute: sendMinute,
+		LastSendAt: lastSendAt,
+	}, nil
+}

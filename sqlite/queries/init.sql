@@ -19,5 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)) DEFAULT 1,
     send_hour INTEGER NOT NULL CHECK (send_hour BETWEEN 0 AND 23) DEFAULT 12,
     send_minute INTEGER NOT NULL CHECK (send_minute BETWEEN 0 AND 59) DEFAULT 0,
-    last_send_at INTEGER,
-)
+    last_send_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_enabled ON users(enabled);

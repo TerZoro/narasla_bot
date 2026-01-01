@@ -20,7 +20,12 @@ type Storage interface {
 	List(ctx context.Context, ownerID int64, username string, limit, offset int) ([]Page, error)
 	Count(ctx context.Context, ownerID int64) (int, error)
 	IsExists(ctx context.Context, ownerID int64, url string) (bool, error)
+
 	ListEnabledUsers(ctx context.Context) ([]User, error)
+	UpdateLastSendAt(ctx context.Context, ownerID, newTime int64) error
+	UpdateUserInfo(ctx context.Context, ownerID, chatID int64, username string) error
+	SwitchEnable(ctx context.Context, ownerID int64, enabled bool) error
+	GetUserInfo(ctx context.Context, ownerID int64) (*User, error)
 }
 
 type User struct {
@@ -37,6 +42,7 @@ type User struct {
 var (
 	ErrNoSavedPages = errors.New("Storage: no saved pages")
 	ErrNotFound     = errors.New("Storage: page not found")
+	ErrUserNotFound = errors.New("Storage: user not found")
 )
 
 type Page struct {

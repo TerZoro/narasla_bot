@@ -7,19 +7,20 @@ import (
 
 func (p *Processor) initHandlers() {
 	p.handlers = map[string]handler{
-		SaveCmd:   p.hSave,
-		RndCmd:    p.hRand,
-		HelpCmd:   p.hHelp,
-		StartCmd:  p.hStart,
-		DeleteCmd: p.hDel,
-		ListCmd:   p.hList,
+		SaveCmd:     p.hSave,
+		RndCmd:      p.hRand,
+		HelpCmd:     p.hHelp,
+		StartCmd:    p.hStart,
+		DeleteCmd:   p.hDel,
+		ListCmd:     p.hList,
+		AutopushCmd: p.hAutopush,
 	}
 }
 
 func (p *Processor) middleHandler(ctx context.Context, cmd, arg string, m Meta) error {
 	h, ok := p.handlers[cmd]
 	if !ok {
-		return p.tg.SendMessage(ctx, m.Chat.ID, m.UserID, msgUnknownCommand)
+		return p.tg.SendMessage(ctx, m.Chat.ID, msgUnknownCommand)
 	}
 
 	return h(ctx, arg, m)
@@ -28,7 +29,7 @@ func (p *Processor) middleHandler(ctx context.Context, cmd, arg string, m Meta) 
 func (p *Processor) hSave(ctx context.Context, arg string, m Meta) error {
 	arg = strings.TrimSpace(arg)
 	if arg == "" || !isAddCmd(arg) {
-		return p.tg.SendMessage(ctx, m.Chat.ID, m.UserID, msgIncorrectSave)
+		return p.tg.SendMessage(ctx, m.Chat.ID, msgIncorrectSave)
 	}
 
 	return p.savePage(ctx, m.Chat.ID, m.UserID, arg, m.Username)
@@ -39,11 +40,11 @@ func (p *Processor) hRand(ctx context.Context, arg string, m Meta) error {
 }
 
 func (p *Processor) hHelp(ctx context.Context, arg string, m Meta) error {
-	return p.tg.SendMessage(ctx, m.Chat.ID, m.UserID, msgHelp)
+	return p.tg.SendMessage(ctx, m.Chat.ID, msgHelp)
 }
 
 func (p *Processor) hStart(ctx context.Context, arg string, m Meta) error {
-	return p.tg.SendMessage(ctx, m.Chat.ID, m.UserID, msgHello)
+	return p.tg.SendMessage(ctx, m.Chat.ID, msgHello)
 }
 
 func (p *Processor) hDel(ctx context.Context, arg string, m Meta) error {
@@ -53,4 +54,8 @@ func (p *Processor) hDel(ctx context.Context, arg string, m Meta) error {
 
 func (p *Processor) hList(ctx context.Context, arg string, m Meta) error {
 	return p.sendList(ctx, m.Chat.ID, m.UserID, m.Username)
+}
+
+func (p *Processor) hAutopush(ctx context.Context, arg string, m Meta) error {
+	return p.autopush(ctx, m.Chat.ID, m.UserID, arg)
 }

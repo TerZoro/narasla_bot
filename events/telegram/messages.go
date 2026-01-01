@@ -32,4 +32,8 @@ const (
 	msgDeleted            = "Page was deleted."
 	msgIncorrectDeleteArg = "Usage: /del or /del <number> or /del <url>"
 	msgIncorrectSave      = "Usage: /save <url>"
+	msgAutopushTurnedOff  = "Auto push turned off"
+	msgAutopushTurnedOn   = "Auto push turned on"
+	msgIncorrectAutopush  = "Usage: /autopush on | off or nothing to toggle"
+	msgUnknownUser        = "I don't know you yet. Send /start in private chat first"
 )

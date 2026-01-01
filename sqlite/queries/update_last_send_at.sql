@@ -1,0 +1,1 @@
+UPDATE users SET last_send_at = ? WHERE owner_id = ?; 

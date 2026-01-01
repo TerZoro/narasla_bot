@@ -53,11 +53,10 @@ func (c *Client) Updates(ctx context.Context, offset int, limit int) ([]Update, 
 	return res.Result, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, chatID, userID int64, text string) error {
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
 	q := url.Values{}
 
 	q.Add("chat_id", strconv.FormatInt(chatID, 10))
-	q.Add("user_id", strconv.FormatInt(chatID, 10))
 	q.Add("text", text)
 
 	_, err := c.doRequest(ctx, sendMessageMethod, q)
