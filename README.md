@@ -47,13 +47,13 @@ BOT_USERNAME=your_bot_username
 STORAGE_PATH=/absolute/path/to/storage.db
 ```
 ### 3) Option A: Run with Go (Binary)
-Build: ```go build -o bin/na_raslabot```
-Run: ```bin/na_raslabot```
-Stop: Press **Ctrl + C**
+- Build: ```go build -o bin/na_raslabot```
+- Run: ```bin/na_raslabot```
+- Stop: Press **Ctrl + C**
+
 ### 4) Option B: Run with Docker Compose
-Build: ```docker compose up --build -d```
-View logs: ```docker compose logs -f```
-Stop logs View: Press **Ctrl + C**
-Stop Container: ```docker compose down```
-Stop and remove volumes (this will delete SQLite database inside the volume):
-```docker compose down -v```
+- Build: ```docker compose up --build -d```
+- View logs: ```docker compose logs -f```
+- Stop logs View: Press **Ctrl + C**
+- Stop Container: ```docker compose down```
+- Stop and remove volumes (this will delete SQLite database inside the volume): ```docker compose down -v```
