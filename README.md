@@ -1,5 +1,7 @@
 # Na Rasla Bot
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 A simple “save now, read later” Telegram bot.
 
 Send a link — it saves it to your personal list. Later you can get a random saved page, list everything, or delete items.
