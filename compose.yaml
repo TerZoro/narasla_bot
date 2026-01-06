@@ -1,0 +1,17 @@
+services:
+  na-raslabot:
+    build: .
+    image: docker-na-raslabot:multistage
+    container_name: na-raslabot
+    env_file: .env
+    environment:
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN}
+      BOT_USERNAME: ${BOT_USERNAME}
+      STORAGE_PATH: /data/storage.db
+    volumes:
+      - na_raslabot_data:/data
+    restart: on-failure
+
+volumes:
+  na_raslabot_data:
+    name: na_raslabot_data
