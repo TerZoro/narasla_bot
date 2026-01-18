@@ -45,9 +45,10 @@ func (s *Storage) Save(ctx context.Context, page *storage.Page) error {
 
 func (s *Storage) PickRandom(ctx context.Context, ownerID int64) (*storage.Page, error) {
 	var pageID int64
+	var chatId int64
 	var url string
 
-	err := s.db.QueryRowContext(ctx, qPickRandom, ownerID).Scan(&pageID, &url)
+	err := s.db.QueryRowContext(ctx, qPickRandom, ownerID).Scan(&pageID, &chatId, &url)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storage.ErrNoSavedPages
 	}
@@ -58,6 +59,7 @@ func (s *Storage) PickRandom(ctx context.Context, ownerID int64) (*storage.Page,
 	return &storage.Page{
 		ID:      pageID,
 		URL:     url,
+		ChatID:  chatId,
 		OwnerID: ownerID,
 	}, nil
 }
@@ -189,8 +191,8 @@ func (s *Storage) ListEnabledUsers(ctx context.Context) ([]storage.User, error) 
 	return enabledUsers, nil
 }
 
-func (s *Storage) UpdateLastSendAt(ctx context.Context, ownerID, newTime int64) error {
-	if _, err := s.db.ExecContext(ctx, qUpdateLastSendAt, newTime, ownerID); err != nil {
+func (s *Storage) UpdateLastSendAt(ctx context.Context, ownerID, newTime int64, newHour, newMinute int) error {
+	if _, err := s.db.ExecContext(ctx, qUpdateLastSendAt, newTime, newHour, newMinute, ownerID); err != nil {
 		return fmt.Errorf("can't update last send at for user: %w", err)
 	}
 

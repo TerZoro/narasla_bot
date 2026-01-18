@@ -1,1 +1,1 @@
-UPDATE users SET last_send_at = ? WHERE owner_id = ?; 
+UPDATE users SET last_send_at = ?, send_hour = ?, send_minute = ? WHERE owner_id = ?; 

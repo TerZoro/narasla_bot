@@ -9,7 +9,7 @@ type SchedulerStorage interface {
 	ListEnabledUsers(ctx context.Context) ([]storage.User, error)
 	PickRandom(ctx context.Context, ownerID int64) (*storage.Page, error)
 	Remove(ctx context.Context, p *storage.Page) error
-	UpdateLastSendAt(ctx context.Context, ownerID, newTime int64) error
+	UpdateLastSendAt(ctx context.Context, ownerID, newTime int64, newHour, newMinute int) error
 }
 
 type Sender interface {

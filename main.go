@@ -55,7 +55,7 @@ func main() {
 		botUsername,
 	)
 
-	sch := scheduler.New(s, tgCl, 1*time.Minute)
+	sch := scheduler.New(s, tgCl, 10*time.Minute)
 	go func() {
 		if err := sch.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Printf("scheduler stopped: %v", err)

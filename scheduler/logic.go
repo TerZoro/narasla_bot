@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"narasla_bot/storage"
 	"time"
 )
@@ -43,16 +44,6 @@ func (s *Scheduler) shouldSendNow(u storage.User, now time.Time) (bool, error) {
 
 	nowLocal := now.In(loc)
 
-	timeToSend := time.Date(
-		nowLocal.Year(), nowLocal.Month(), nowLocal.Day(),
-		u.SendHour, u.SendMinute, 0, 0,
-		loc,
-	)
-
-	if nowLocal.Before(timeToSend) {
-		return false, nil
-	}
-
 	if !u.LastSendAt.Valid {
 		return true, nil
 	}
@@ -62,7 +53,13 @@ func (s *Scheduler) shouldSendNow(u storage.User, now time.Time) (bool, error) {
 		return false, nil
 	}
 
-	return true, nil
+	timeToSend := time.Date(
+		nowLocal.Year(), nowLocal.Month(), nowLocal.Day(),
+		u.SendHour, u.SendMinute, 0, 0,
+		loc,
+	)
+
+	return nowLocal.After(timeToSend), nil
 }
 
 func (s *Scheduler) sendOne(ctx context.Context, u storage.User, now time.Time) error {
@@ -71,7 +68,9 @@ func (s *Scheduler) sendOne(ctx context.Context, u storage.User, now time.Time) 
 		return err
 	}
 
-	if err := s.tg.SendMessage(ctx, u.ChatID, page.URL); err != nil {
+	// hardcoded: u.ChatID if you want scheduler to send only in private.
+	// rn, it will send to the last chatID whether it is Group of Private.
+	if err := s.tg.SendMessage(ctx, page.ChatID, page.URL); err != nil {
 		return err
 	}
 
@@ -79,7 +78,10 @@ func (s *Scheduler) sendOne(ctx context.Context, u storage.User, now time.Time) 
 		return err
 	}
 
-	return s.st.UpdateLastSendAt(ctx, u.OwnerID, now.Unix())
+	newHour := 9 + rand.Intn(15) // from 9 to 23
+	newMinute := rand.Intn(60)
+
+	return s.st.UpdateLastSendAt(ctx, u.OwnerID, now.Unix(), newHour, newMinute)
 }
 
 func alrSendToday(first, last time.Time) bool {

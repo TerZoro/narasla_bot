@@ -22,7 +22,7 @@ type Storage interface {
 	IsExists(ctx context.Context, ownerID int64, url string) (bool, error)
 
 	ListEnabledUsers(ctx context.Context) ([]User, error)
-	UpdateLastSendAt(ctx context.Context, ownerID, newTime int64) error
+	UpdateLastSendAt(ctx context.Context, ownerID, newTime int64, newHour, newMinute int) error
 	UpdateUserInfo(ctx context.Context, ownerID, chatID int64, username string) error
 	SwitchEnable(ctx context.Context, ownerID int64, enabled bool) error
 	GetUserInfo(ctx context.Context, ownerID int64) (*User, error)

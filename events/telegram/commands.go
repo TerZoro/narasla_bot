@@ -39,9 +39,7 @@ func (p *Processor) doCmd(ctx context.Context, text string, m Meta) error {
 		return nil
 	}
 
-	log.Printf("Chat Type: %s", m.Chat.Type)
-
-	if m.Chat.Type == "private" && isAddCmd(text) {
+	if isAddCmd(text) {
 		return p.savePage(ctx, m.Chat.ID, m.UserID, text, m.Username)
 	}
 
@@ -65,6 +63,7 @@ func (p *Processor) doCmd(ctx context.Context, text string, m Meta) error {
 		return nil
 	}
 
+	log.Printf("Chat Type: %s", m.Chat.Type)
 	log.Printf("Commands: got new message '{\n%s\n}' from '%s'", text, m.Username)
 
 	return p.middleHandler(ctx, cmd, arg, m)
@@ -275,7 +274,6 @@ func (p *Processor) autopush(ctx context.Context, chatID, userID int64, arg stri
 		desired = true
 	case "off":
 		desired = false
-
 	case "":
 		desired = !user.Enabled
 	default:
