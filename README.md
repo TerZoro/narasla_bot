@@ -30,9 +30,8 @@ Send a link — it saves it to your personal list. Later you can get a random sa
   - `/autopush` (toggle)
 
 ## Auto-send (daily)
-- When **autopush is enabled**, the bot sends **one page per day** at `12:00` until `23:00` (Asia/Almaty) and removes it from your list.
-- For now, the schedule is global (no per-user time settings yet).
-- Current implementation checks users on a scheduler tick (currently **every minute**). This is OK for now; it can be optimized later to sleep until the next planned send time.
+- When **autopush is enabled**, the bot sends **one page per day** randomly from `12:00` until `23:59` (Asia/Almaty) and removes it from your list.
+- Current implementation checks users on a scheduler tick (currently **every 10 minute**).
 
 ## Run locally
 ### 1) Requirements
