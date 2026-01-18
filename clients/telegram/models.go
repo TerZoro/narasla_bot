@@ -1,8 +1,14 @@
 package telegram
 
 type UpdatesResponse struct {
-	Ok     bool     `json:"ok"`
-	Result []Update `json:"result"`
+	Ok          bool     `json:"ok"`
+	Result      []Update `json:"result"`
+	Description string   `json:"description"`
+}
+
+type APIResponse struct {
+	Ok          bool   `json:"ok"`
+	Description string `json:"description"`
 }
 
 type Update struct {

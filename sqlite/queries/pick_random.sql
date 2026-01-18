@@ -1,1 +1,1 @@
-SELECT id, , chat_id, url FROM pages WHERE owner_id = ? ORDER BY RANDOM() Limit 1;
+SELECT id, chat_id, url FROM pages WHERE owner_id = ? ORDER BY RANDOM() Limit 1;

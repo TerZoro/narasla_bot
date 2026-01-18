@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"narasla_bot/lib/e"
 	"net/http"
@@ -18,7 +19,7 @@ type Client struct {
 }
 
 const (
-	getUpdatesmethod  = "getUpdates"
+	getUpdatesMethod  = "getUpdates"
 	sendMessageMethod = "sendMessage"
 )
 
@@ -39,15 +40,18 @@ func (c *Client) Updates(ctx context.Context, offset int, limit int) ([]Update, 
 	q.Add("offset", strconv.Itoa(offset))
 	q.Add("limit", strconv.Itoa(limit))
 
-	data, err := c.doRequest(ctx, getUpdatesmethod, q)
+	data, err := c.doRequest(ctx, getUpdatesMethod, q)
 	if err != nil {
 		return nil, err
 	}
 
 	var res UpdatesResponse
-
 	if err := json.Unmarshal(data, &res); err != nil {
-		return nil, err
+		return nil, e.Wrap("failed to decode response", err)
+	}
+
+	if !res.Ok {
+		return nil, fmt.Errorf("api error: %s", res.Description)
 	}
 
 	return res.Result, nil
@@ -59,9 +63,18 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) err
 	q.Add("chat_id", strconv.FormatInt(chatID, 10))
 	q.Add("text", text)
 
-	_, err := c.doRequest(ctx, sendMessageMethod, q)
+	data, err := c.doRequest(ctx, sendMessageMethod, q)
 	if err != nil {
 		return e.Wrap("sendMessage doRequest fail", err)
+	}
+
+	var res APIResponse
+	if err := json.Unmarshal(data, &res); err != nil {
+		return e.Wrap("failed to decode response", err)
+	}
+
+	if !res.Ok {
+		return fmt.Errorf("api error: %s", res.Description)
 	}
 
 	return nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"narasla_bot/storage"
+	"strings"
 	"time"
 )
 
@@ -71,6 +72,15 @@ func (s *Scheduler) sendOne(ctx context.Context, u storage.User, now time.Time) 
 	// hardcoded: u.ChatID if you want scheduler to send only in private.
 	// rn, it will send to the last chatID whether it is Group of Private.
 	if err := s.tg.SendMessage(ctx, page.ChatID, page.URL); err != nil {
+		if isGroupInaccessible(err) {
+			msg := "The Group is no longer accessible. Here is your page:\n" + page.URL
+			if err := s.tg.SendMessage(ctx, u.ChatID, msg); err != nil {
+				return fmt.Errorf("failed fallback to send: %w", err)
+			}
+		} else {
+			return err
+		}
+
 		return err
 	}
 
@@ -89,4 +99,15 @@ func alrSendToday(first, last time.Time) bool {
 	lastY, lastM, lastD := last.Date()
 
 	return firstY == lastY && firstM == lastM && firstD == lastD
+}
+
+func isGroupInaccessible(err error) bool {
+	msg := strings.ToLower(err.Error())
+
+	for _, s := range apiErrMessages {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
 }
